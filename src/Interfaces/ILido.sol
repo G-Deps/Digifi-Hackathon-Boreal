@@ -3,6 +3,7 @@
 
 pragma solidity >=0.8.0;
 import "./ILidoLocator.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
 * @title Liquid staking pool implementation
@@ -26,7 +27,7 @@ import "./ILidoLocator.sol";
 *
 * `Versioned` and `AragonApp` both don't have the pre-allocated structured storage.
 */
-interface ILido {
+interface ILido is IERC20{
   
 
     // Staking was paused (don't accept user's ether submits)
@@ -393,4 +394,6 @@ interface ILido {
     );
 
     function transferShares(address _recipient, uint256 _sharesAmount) external returns (uint256);
+
+    function getPooledEthByShares(uint256 _sharesAmount) external view returns (uint256);
 }

@@ -24,11 +24,14 @@ contract UniswapV3Liquidity is IERC721Receiver {
     int24 private constant MAX_TICK = -MIN_TICK;
     int24 private constant TICK_SPACING = 60;
 
-    IWETH public matic = IWETH(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270);
+    IWETH public WETH = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     
     mapping (address => uint256[]) public positionsOwned;
 
+
+    ///@notice @audit
+    /// CHECK THOSE ADDRESSES FOR MAINNET
     INonfungiblePositionManager public manager = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
     IUniswapV3Factory public factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
     ISwapRouter private constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -46,7 +49,7 @@ contract UniswapV3Liquidity is IERC721Receiver {
         address from,
         uint tokenId,
         bytes calldata
-    ) external override(IERC721Receiver) returns (bytes4) {
+    ) external pure override(IERC721Receiver) returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
     }
 
@@ -76,7 +79,7 @@ contract UniswapV3Liquidity is IERC721Receiver {
                 deadline: block.timestamp
             });
 
-        (uint tokenId,uint128 liquidity , uint amount0, uint amount1) = manager.mint(params);
+        (uint tokenId,/*uint128 liquidity*/, uint amount0, uint amount1) = manager.mint(params);
         
         positionsOwned[msg.sender].push(tokenId);
     
@@ -116,7 +119,7 @@ contract UniswapV3Liquidity is IERC721Receiver {
                     deadline: block.timestamp
                 });
 
-        (uint128 liquidity, uint amount0, uint amount1) = manager.increaseLiquidity(params);
+        (/*uint128 liquidity*/, uint amount0, uint amount1) = manager.increaseLiquidity(params);
         
         if (amount0 < amount0ToAdd) {
             IERC20(token0).transfer(msg.sender, amount0ToAdd - amount0);
@@ -128,7 +131,7 @@ contract UniswapV3Liquidity is IERC721Receiver {
         IERC20(token1).approve(address(manager), 0);
     }
 
-    function decreaseLiquidity(uint tokenId, uint24 percentageToDecrease) public {
+    function decreaseLiquidity(uint tokenId, uint24 percentageToDecrease) public returns(uint256 amount0, uint256 amount1) {
         
         ( uint128 _liquidity) = getLiquidity(tokenId);
         uint128 _aux = (_liquidity*percentageToDecrease)/100;
@@ -145,11 +148,11 @@ contract UniswapV3Liquidity is IERC721Receiver {
                     amount1Min: 0,
                     deadline: block.timestamp
                 });
-        (uint256 amount0, uint256 amount1) = manager.decreaseLiquidity(params);
+        ( amount0, amount1) = manager.decreaseLiquidity(params);
     }
 
-    function collectFee(uint tokenId) public {
-        (, , address token0, address token1, , , , , , , uint128 tokensOwed0, uint128 tokensOwed1) = manager.positions(tokenId);
+    function collectFee(uint tokenId) public returns (uint256 amount0, uint256 amount1){
+        (, , /*address token0*/, /*address token1*/, , , , , , , uint128 tokensOwed0, uint128 tokensOwed1) = manager.positions(tokenId);
         require(tokensOwed0 > 0 || tokensOwed1 > 0, "no fees to collect");
         
         INonfungiblePositionManager.CollectParams
@@ -160,7 +163,7 @@ contract UniswapV3Liquidity is IERC721Receiver {
                 amount1Max: type(uint128).max
             });
 
-        (uint256 amount0, uint256 amount1) = manager.collect(params);
+        (amount0, amount1) = manager.collect(params);
     }
 
     function removePosition(uint tokenId) external {
@@ -208,15 +211,15 @@ contract UniswapV3Liquidity is IERC721Receiver {
         return liquidity;
     }
 
-    function _getTokens(uint256 tokenId) internal returns (address _token0, address _token1){
+    function _getTokens(uint256 tokenId) internal view returns (address _token0, address _token1){
         (, ,  _token0, _token1, , , , , , , , ) = manager.positions(tokenId);
     }
 
-    function checkFees(uint256 tokenId) public returns (address _token0, address _token1, uint128 tokensOwed0, uint128 tokensOwed1){
+    function checkFees(uint256 tokenId) public view returns (address _token0, address _token1, uint128 tokensOwed0, uint128 tokensOwed1){
         (, , _token0, _token1, , , , , , , tokensOwed0, tokensOwed1) = manager.positions(tokenId);
     }
 
-    function _auxTickFromPercentage(address _token0, address _token1,uint24 _fee, uint _percentageLow, uint _percentageUp) internal returns (int24 tickLower, int24 tickUpper){
+    function _auxTickFromPercentage(address _token0, address _token1,uint24 _fee, uint _percentageLow, uint _percentageUp) internal view returns (int24 tickLower, int24 tickUpper){
         
         address _pool = checkPool(_token0,_token1,_fee); // get pool address
 
@@ -305,14 +308,14 @@ contract UniswapV3Liquidity is IERC721Receiver {
 
     
 
-    function swapForWMatic() external payable {
-        matic.deposit{value: msg.value}();
-        matic.transfer(msg.sender, matic.balanceOf(address(this)));
+    function swapForWETH() external payable {
+        WETH.deposit{value: msg.value}();
+        WETH.transfer(msg.sender, WETH.balanceOf(address(this)));
     }
 
-    function swapFromWMatic(uint256 amount) external {
-        require(matic.balanceOf(msg.sender) >= amount,"Not enough");
-        matic.withdraw(amount);
+    function swapFromWETH(uint256 amount) external {
+        require(WETH.balanceOf(msg.sender) >= amount,"Not enough");
+        WETH.withdraw(amount);
         payable(msg.sender).transfer(amount);
     }
 
@@ -321,7 +324,7 @@ contract UniswapV3Liquidity is IERC721Receiver {
     ///--------------------------------------------------------------------------------------------------------
 
 
-    function simulateOutputSingle(address tokenIn, address tokenOut, uint24 fee,uint amountOut, uint amountInMax)
+    function simulateOutputSingle(address tokenIn, address tokenOut, uint24 fee,uint amountOut /*uint amountInMax*/)
     external returns (uint256 amountIn, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate){
         IQuoterV2.QuoteExactOutputSingleParams memory params = IQuoterV2.
         QuoteExactOutputSingleParams ({
@@ -332,7 +335,7 @@ contract UniswapV3Liquidity is IERC721Receiver {
             sqrtPriceLimitX96: 0
         });
 
-        (uint256 amountIn, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate) = quoter.quoteExactOutputSingle(params);
+        (amountIn,sqrtPriceX96After,initializedTicksCrossed,gasEstimate) = quoter.quoteExactOutputSingle(params);
     }
 
     function simulateInputSingle(address tokenIn, address tokenOut, uint24 fee,uint amountIn)
@@ -346,7 +349,7 @@ contract UniswapV3Liquidity is IERC721Receiver {
             sqrtPriceLimitX96: 0
         });
 
-        (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate) = quoter.quoteExactInputSingle(params);
+        (amountOut,sqrtPriceX96After,initializedTicksCrossed,gasEstimate) = quoter.quoteExactInputSingle(params);
     }
 
 

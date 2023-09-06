@@ -3,6 +3,9 @@ pragma solidity ^0.8.0;
 
 import "./Utils/UniswapV3-Proxy.sol";
 import "./Interfaces/ILido.sol";
+import "./Interfaces/IwstETH.sol";
+import "./Interfaces/IwithdrawalQueue.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Boreal is UniswapV3Liquidity{
@@ -13,7 +16,11 @@ contract Boreal is UniswapV3Liquidity{
 
     //Ethereum : 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0
     //Gorli : 0x6320cD32aA674d2898A68ec82e869385Fc5f7E2f
-    address public wstETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+    IwstETH public wstETH = IwstETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
+
+    //Ethereum : 0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1
+    //Gorli : 0xCF117961421cA9e546cD7f50bC73abCdB3039533
+    IwithdrawalQueue public withdrawalQueue = IwithdrawalQueue(0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1);
 
     address public wDREX;
 
@@ -21,10 +28,11 @@ contract Boreal is UniswapV3Liquidity{
 
     address public multisig;
     
+    mapping (uint256 => uint256) public requests;
 
     constructor(uint160 _sqrtPricex96, address _multisig, address _wDREX){
         wDREX = _wDREX;
-        address _pool = UniswapV3Liquidity.checkPool(wstETH, wDREX, 500);
+        address _pool = UniswapV3Liquidity.checkPool(address(wstETH), wDREX, 500);
         if (_pool == address(0)){
             // uniPool = UniswapV3Liquidity.createPool(wstETH, wDREX, 500, _sqrtPricex96);
         } else {
@@ -34,18 +42,70 @@ contract Boreal is UniswapV3Liquidity{
         multisig = _multisig;
     }
 
+    receive() external payable {}
 
-    function depositForStETH() external payable returns(uint256){
-        uint256 _amount = lidoContract.submit{value: msg.value}(multisig);
 
-        lidoContract.transferShares(msg.sender, _amount);
+    function depositForStETH() external payable returns(uint256 _amount){
+        _amount = lidoContract.submit{value: msg.value}(multisig);
+
+        require(lidoContract.transferShares(msg.sender, _amount) > 0,"Boreal : Shares transfer failed");
     }
     function depositForWstETH() external payable {
-        (bool _success,bytes memory _bytes) = wstETH.call{value:msg.value}("");
+        uint256 _shares = lidoContract.submit{value: msg.value}(multisig);
+        uint256 _stETH = lidoContract.getPooledEthByShares(_shares);
 
-        require(_success);
+        lidoContract.approve(address(wstETH), _stETH);
 
-        IERC20(wstETH).transfer(msg.sender, _bytesToUint(_bytes));
+        uint _wstETH = wstETH.wrap(_stETH);
+
+        require(wstETH.transfer(msg.sender, _wstETH), "Boreal : wstETH transfer failed");
+    }
+
+    function wrapStETH(uint256 _amount) external {
+        require(lidoContract.allowance(msg.sender, address(this)) >= _amount,"Boreal : Not enough allowance");
+        require(lidoContract.transferFrom(msg.sender, address(this), _amount),"Boreal : stETH transfer failed from the allowance");
+        lidoContract.approve(address(wstETH),_amount);
+        uint _wstETH = wstETH.wrap(_amount);
+
+        require(wstETH.transfer(msg.sender, _wstETH),"Boreal : wstETH transfer failed on wrap");
+
+    }
+
+    function unwrapWstETH(uint256 _amount) external {
+        require(wstETH.allowance(msg.sender, address(this)) >= _amount, "Boreal, Not enough allowance");
+
+        require(wstETH.transferFrom(msg.sender, address(this), _amount), "Boreal : wstETH transfer failed from the allowance");
+
+        wstETH.approve(address(wstETH), _amount);
+        uint256 _stETH = wstETH.unwrap(_amount);
+
+        require(lidoContract.transfer(msg.sender, _stETH),"Boreal : stETH transfer failed");
+    }
+
+
+    function queueSingleWithdraw(uint256[] calldata _amounts) external returns(uint256 _requestID){
+        require(_amounts.length == 1, "Boreal : Can only require one withdraw");
+        require(lidoContract.allowance(msg.sender, address(this)) >= _amounts[0], "Boreal : You have to approve the amount");
+        require(lidoContract.transferFrom(msg.sender, address(this), _amounts[0]),"Boreal : Transfer of stETH from msg.sender failed");
+        //uint256[] calldata _amounts, address _owner
+        lidoContract.approve(address(withdrawalQueue), _amounts[0]);
+        _requestID = withdrawalQueue.requestWithdrawals(_amounts, address(0))[0];
+        requests[_requestID] = _amounts[0];
+        withdrawalQueue.transferFrom(address(this), msg.sender, _requestID);
+    }
+
+    function executeWithdraw(uint256 _requestID) external {
+        require(requests[_requestID] > 0, "Boreal : Either not requested here or already claimed");
+        address owner = withdrawalQueue.ownerOf(_requestID);
+        require(owner == msg.sender, "Boreal : Only the withdrawal request owner can withdraw");
+        require(withdrawalQueue.getApproved(_requestID) == address(this), "Boreal : You have to approve this address");
+
+        withdrawalQueue.transferFrom(msg.sender, address(this), _requestID);
+        withdrawalQueue.claimWithdrawal(_requestID);
+
+        (bool _success, ) = payable(msg.sender).call{value : requests[_requestID]}("");
+
+        require(_success, "Boreal : Not able to receive the ether");
     }
 
 
