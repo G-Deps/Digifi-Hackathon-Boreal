@@ -24,14 +24,13 @@ contract UniswapV3Liquidity is IERC721Receiver {
     int24 private constant MAX_TICK = -MIN_TICK;
     int24 private constant TICK_SPACING = 60;
 
-    IWETH public WETH = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    IWETH public WETH = IWETH(0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6);
 
     
     mapping (address => uint256[]) public positionsOwned;
 
 
-    ///@notice @audit
-    /// CHECK THOSE ADDRESSES FOR MAINNET
+    /// Mainnet, Goerli, Arbitrum, Optimism, Polygon Address
     INonfungiblePositionManager public manager = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
     IUniswapV3Factory public factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
     ISwapRouter private constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -308,13 +307,15 @@ contract UniswapV3Liquidity is IERC721Receiver {
 
     
 
-    function swapForWETH() external payable {
+    function swapForWNATIVE() external payable {
         WETH.deposit{value: msg.value}();
         WETH.transfer(msg.sender, WETH.balanceOf(address(this)));
     }
 
-    function swapFromWETH(uint256 amount) external {
+    function swapFromWNATIVE(uint256 amount) external {
         require(WETH.balanceOf(msg.sender) >= amount,"Not enough");
+        require(WETH.allowance(msg.sender, address(this)) >= amount, "Not enough allowance");
+        require(WETH.transferFrom(msg.sender, address(this), amount),"Transfer from msg.sender failed");
         WETH.withdraw(amount);
         payable(msg.sender).transfer(amount);
     }
