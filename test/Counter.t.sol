@@ -35,7 +35,9 @@ contract BorealTest is Test {
         wDrex = new mockERC20();
 
         vm.deal(main, 10 ether);
-        boreal = new Boreal(uint160(3924), address(0), address(wDrex));
+        boreal = new Boreal(8124 ether, address(0), address(wDrex));
+
+        console.log("Uni Pool sqrtPriceX96 : ", boreal.getSlot0());
 
         vm.stopPrank();
     }

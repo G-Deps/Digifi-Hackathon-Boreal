@@ -30,11 +30,14 @@ contract Boreal is UniswapV3Liquidity{
     
     mapping (uint256 => uint256) public requests;
 
-    constructor(uint160 _sqrtPricex96, address _multisig, address _wDREX){
+    //price sqrt(token1/token0) Q64.96
+    constructor(uint256 _price, address _multisig, address _wDREX){
         wDREX = _wDREX;
-        address _pool = UniswapV3Liquidity.checkPool(address(wstETH), wDREX, 500);
+
+        uint160 _sqrtPricex96 = uint160(sqrt(_price)*(2**96));
+        address _pool = UniswapV3Liquidity.checkPool(wDREX, address(wstETH), 500);
         if (_pool == address(0)){
-            // uniPool = UniswapV3Liquidity.createPool(wstETH, wDREX, 500, _sqrtPricex96);
+            uniPool = UniswapV3Liquidity.createPool(wDREX, address(wstETH), 500, _sqrtPricex96);
         } else {
             uniPool = _pool;
         }
@@ -115,6 +118,10 @@ contract Boreal is UniswapV3Liquidity{
             number = number + uint(uint8(b[i]))*(2**(8*(b.length-(i+1))));
         }
         return number;
+    }
+
+    function getSlot0() external view returns(uint160 _sqrtPriceX96){
+        (_sqrtPriceX96,,,,,,) = IUniswapV3Pool(uniPool).slot0();
     }
 
 }
