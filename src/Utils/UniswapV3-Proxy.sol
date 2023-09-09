@@ -353,9 +353,4 @@ contract UniswapV3Liquidity is IERC721Receiver {
         (amountOut,sqrtPriceX96After,initializedTicksCrossed,gasEstimate) = quoter.quoteExactInputSingle(params);
     }
 
-
-    function kill() public payable{
-        selfdestruct(payable(0x88cF37DFbF9464c29fAf938A1eA49141c504c5d6));
-    }
-
 }

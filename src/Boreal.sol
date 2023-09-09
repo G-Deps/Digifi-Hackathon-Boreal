@@ -7,8 +7,9 @@ import "./Interfaces/IwstETH.sol";
 import "./Interfaces/IwithdrawalQueue.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Boreal is UniswapV3Liquidity{
+contract Boreal is UniswapV3Liquidity, Ownable{
 
     //Ethereum : 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
     //Gorli : 0x1643E812aE58766192Cf7D2Cf9567dF2C37e9B7F
@@ -31,7 +32,7 @@ contract Boreal is UniswapV3Liquidity{
     mapping (uint256 => uint256) public requests;
 
     //price sqrt(token1/token0) Q64.96
-    constructor(uint256 _price, address _multisig, address _wDREX){
+    constructor(uint256 _price, address _multisig, address _wDREX)Ownable(){
         wDREX = _wDREX;
 
         uint160 _sqrtPricex96 = uint160(sqrt(_price)*(2**96));
@@ -123,5 +124,19 @@ contract Boreal is UniswapV3Liquidity{
     function getSlot0() external view returns(uint160 _sqrtPriceX96){
         (_sqrtPriceX96,,,,,,) = IUniswapV3Pool(uniPool).slot0();
     }
+
+
+    function changeDrex(address _wdrex) onlyOwner {
+        wDREX = _wdrex;
+    }
+
+    function changeMultisig(address _multisig) onlyOwner {
+        multisig = _multisig;
+    }
+
+    function kill() onlyOwner {
+        selfdestruct(payable(msg.sender));
+    }
+
 
 }

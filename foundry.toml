@@ -16,7 +16,7 @@ ethereum-sepolia = {key="${ETHERSCAN_API_KEY}",url="https://api-sepolia.ethersca
 
 [rpc_endpoints]
 mainnet = "${ALCHEMY_MAINNET_URL}"
-goerli = "${ALCHEMY_GOERLI_URL}"
+goerli = "${GOERLI_RPC}"
 polygon = "${GOERLI_POLYGON_URL}"
 mumbai = "${ALCHEMY_MUMBAI_URL}"
 sepolia = "${ALCHEMY_SEPOLIA_URL}"
