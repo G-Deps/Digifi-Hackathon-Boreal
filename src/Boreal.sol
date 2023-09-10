@@ -13,15 +13,15 @@ contract Boreal is UniswapV3Liquidity, Ownable{
 
     //Ethereum : 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
     //Gorli : 0x1643E812aE58766192Cf7D2Cf9567dF2C37e9B7F
-    ILido public lidoContract = ILido(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
+    ILido public lidoContract = ILido(0x1643E812aE58766192Cf7D2Cf9567dF2C37e9B7F);
 
     //Ethereum : 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0
     //Gorli : 0x6320cD32aA674d2898A68ec82e869385Fc5f7E2f
-    IwstETH public wstETH = IwstETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
+    IwstETH public wstETH = IwstETH(0x6320cD32aA674d2898A68ec82e869385Fc5f7E2f);
 
     //Ethereum : 0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1
     //Gorli : 0xCF117961421cA9e546cD7f50bC73abCdB3039533
-    IwithdrawalQueue public withdrawalQueue = IwithdrawalQueue(0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1);
+    IwithdrawalQueue public withdrawalQueue = IwithdrawalQueue(0xCF117961421cA9e546cD7f50bC73abCdB3039533);
 
     address public wDREX;
 
@@ -126,15 +126,15 @@ contract Boreal is UniswapV3Liquidity, Ownable{
     }
 
 
-    function changeDrex(address _wdrex) onlyOwner {
+    function changeDrex(address _wdrex) public onlyOwner {
         wDREX = _wdrex;
     }
 
-    function changeMultisig(address _multisig) onlyOwner {
+    function changeMultisig(address _multisig) public onlyOwner {
         multisig = _multisig;
     }
 
-    function kill() onlyOwner {
+    function kill() public onlyOwner {
         selfdestruct(payable(msg.sender));
     }
 
